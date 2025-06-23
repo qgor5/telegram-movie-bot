@@ -1,0 +1,15 @@
+{
+  "name": "telegram-movie-bot",
+  "version": "1.0.0",
+  "description": "Автобот для публикации фильмов, сериалов и мультфильмов с TMDb в Telegram-канал",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
+    "node-schedule": "^2.1.1",
+    "node-telegram-bot-api": "^0.61.0"
+  }
+}
