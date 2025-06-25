@@ -1,7 +1,9 @@
 // 📁 index.js
+
 require("dotenv").config();
 const axios = require("axios");
 const TelegramBot = require("node-telegram-bot-api");
+const cron = require("node-cron");
 
 const TOKEN = process.env.TELEGRAM_TOKEN;
 const CHANNEL = process.env.CHANNEL_USERNAME;
@@ -15,9 +17,10 @@ const PUBLISH_HOURS = (process.env.PUBLISH_HOURS || "12,20")
 const bot = new TelegramBot(TOKEN);
 
 function generateSeoDescription(movie) {
-  return `🎬 ${movie.title || movie.name} — ${movie.release_date?.slice(0, 4) || "Новый"} ${
-    movie.media_type === "tv" ? "сериал" : "фильм"
-  }. ${movie.overview?.slice(0, 300) || "Описание отсутствует."}
+  return `🎬 ${movie.title || movie.name} — ${
+    movie.release_date?.slice(0, 4) || "Новый"
+  } ${movie.media_type === "tv" ? "сериал" : "фильм"}.
+${movie.overview?.slice(0, 300) || "Описание отсутствует."}
 
 📺 Смотреть трейлер: https://www.youtube.com/results?search_query=${encodeURIComponent(
     movie.title || movie.name
@@ -37,7 +40,7 @@ async function getTrending() {
     });
     return res.data.results.slice(0, 10);
   } catch (err) {
-    console.error("Ошибка при получении фильмов:", err.message);
+    console.error("❌ Ошибка при получении фильмов:", err.message);
     return [];
   }
 }
@@ -45,7 +48,7 @@ async function getTrending() {
 async function publish() {
   const now = new Date();
   const currentHour = now.getUTCHours();
-  const kievOffset = 3; // UTC+3 летом
+  const kievOffset = 3;
   const localHour = (currentHour + kievOffset) % 24;
 
   if (!PUBLISH_HOURS.includes(localHour)) {
@@ -53,8 +56,7 @@ async function publish() {
     return;
   }
 
-  console.log("\nРасписание публикаций установлено:", PUBLISH_HOURS);
-  console.log("Начинаем публикацию...");
+  console.log("📢 Публикация началась...");
 
   const movies = await getTrending();
   const selected = movies.slice(0, PUBLISH_COUNT);
@@ -72,12 +74,32 @@ async function publish() {
         caption: text,
         parse_mode: "HTML",
       });
+      console.log("✅ Отправлено:", title);
     } catch (err) {
-      console.error("Ошибка отправки в Telegram:", err.message);
+      console.error("❌ Ошибка отправки:", err.message);
     }
   }
 
-  console.log("Публикация завершена.\n");
+  console.log("✅ Публикация завершена.\n");
 }
 
-publish();
+// Расписание: проверка каждые 10 минут
+console.log("🟢 Бот запущен. Ждёт расписания публикации...");
+
+cron.schedule("*/10 * * * *", () => {
+  const now = new Date();
+  const currentHour = now.getUTCHours();
+  const localHour = (currentHour + 3) % 24;
+
+  if (PUBLISH_HOURS.includes(localHour)) {
+    console.log(`⏰ Сейчас ${localHour}:00 — пора публиковать.`);
+    publish();
+  } else {
+    console.log(`🕒 Сейчас ${localHour}:00 — не время публикации.`);
+  }
+});
+
+// Чтобы Railway не засыпал
+setInterval(() => {
+  console.log("⏳ Бот активен, ждёт следующего окна публикации...");
+}, 1000 * 60 * 15); // каждые 15 минут
