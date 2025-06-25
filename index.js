@@ -1,65 +1,79 @@
-// index.js
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
-require('dotenv').config();
+require("dotenv").config();
+const axios = require("axios");
+const TelegramBot = require("node-telegram-bot-api");
 
-// Твой ключ TMDb в .env файле: TMDB_API_KEY=твой_ключ_сюда
+const TOKEN = process.env.TELEGRAM_TOKEN;
+const CHANNEL = process.env.CHANNEL_USERNAME;
+const TMDB_KEY = process.env.TMDB_API_KEY;
+const LANGUAGE = process.env.LANGUAGE || "ru";
+const PUBLISH_COUNT = parseInt(process.env.PUBLISH_COUNT) || 2;
+const PUBLISH_HOURS = (process.env.PUBLISH_HOURS || "12,20")
+  .split(",")
+  .map((h) => parseInt(h));
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN; // Добавь в .env токен бота
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;     // Добавь в .env чат id
+const bot = new TelegramBot(TOKEN);
 
-// Пример жанров с TMDb (можно расширить)
-const genres = {
-  мультфильмы: 16,
-  боевик: 28,
-  драма: 18,
-  комедия: 35,
-};
+function generateSeoDescription(movie) {
+  return `🎬 ${movie.title || movie.name} — ${movie.release_date?.slice(0, 4) || "Новый"} ${movie.media_type === "tv" ? "сериал" : "фильм"}.
+${movie.overview?.slice(0, 300) || "Описание отсутствует."}
 
-// Функция для получения случайного популярного фильма по жанру
-async function getRandomMovie(genreId) {
-  const url = `https://api.themoviedb.org/3/discover/movie?with_genres=${genreId}&language=ru-RU&sort_by=popularity.desc&api_key=${process.env.TMDB_API_KEY}`;
-  const res = await fetch(url);
-  const data = await res.json();
+📺 Смотреть трейлер: https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title || movie.name)}+трейлер
 
-  if (!data.results || data.results.length === 0) {
-    throw new Error('Фильмы не найдены');
-  }
-
-  // Случайный фильм из первых 20 популярных
-  const randomIndex = Math.floor(Math.random() * Math.min(20, data.results.length));
-  return data.results[randomIndex];
+🎞️ Ещё новинки кино: https://www.youtube.com/@KinoBuzz/videos`;
 }
 
-// Заготовка для отправки в Telegram (можно заменить на реальную интеграцию)
-async function postMovie(genre) {
+async function getTrending() {
   try {
-    const genreId = genres[genre.toLowerCase()];
-    if (!genreId) {
-      console.log(`Жанр "${genre}" не найден.`);
-      return;
-    }
-    const movie = await getRandomMovie(genreId);
-    const message = `
-🎬 <b>${movie.title}</b> (${movie.release_date})
-
-📜 Описание: ${movie.overview || 'Описание отсутствует'}
-
-🌟 Рейтинг: ${movie.vote_average} / 10
-
-▶ Трейлер: https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' трейлер')}
-
-#${genre}
-    `;
-
-    // Здесь добавь код отправки message в Telegram через API или библиотеку (например, node-telegram-bot-api)
-
-    console.log('Сообщение для Telegram:');
-    console.log(message);
-
-  } catch (error) {
-    console.error('Ошибка при получении фильма:', error);
+    const url = `https://api.themoviedb.org/3/trending/all/day?api_key=${TMDB_KEY}&language=${LANGUAGE}`;
+    const res = await axios.get(url);
+    const results = res.data.results;
+    return results.length ? results : [];
+  } catch (err) {
+    console.error("Ошибка при получении фильмов:", err.message);
+    return [];
   }
 }
 
-// Пример вызова — выбирает и показывает фильм из жанра "мультфильмы"
-postMovie('мультфильмы');
+async function publish() {
+  const now = new Date();
+  const currentHour = now.getUTCHours();
+  const kievOffset = 3; // UTC+3 летом
+  const localHour = (currentHour + kievOffset) % 24;
+
+  if (!PUBLISH_HOURS.includes(localHour)) {
+    console.log("🕒 Сейчас", localHour, "— не время публикации");
+    return;
+  }
+
+  console.log("\nРасписание публикаций установлено:", PUBLISH_HOURS);
+  console.log("Начинаем публикацию...");
+
+  const movies = await getTrending();
+  if (!movies.length) {
+    console.error("❌ Нет фильмов для публикации.");
+    return;
+  }
+
+  const selected = movies.slice(0, PUBLISH_COUNT);
+
+  for (const movie of selected) {
+    const title = movie.title || movie.name;
+    const imageUrl = movie.poster_path
+      ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+      : null;
+    const text = `⭐️ <b>${title}</b>\n\n${generateSeoDescription(movie)}`;
+
+    try {
+      await bot.sendPhoto(CHANNEL, imageUrl, {
+        caption: text,
+        parse_mode: "HTML",
+      });
+    } catch (err) {
+      console.error("Ошибка отправки в Telegram:", err.message);
+    }
+  }
+
+  console.log("✅ Публикация завершена.\n");
+}
+
+publish();
