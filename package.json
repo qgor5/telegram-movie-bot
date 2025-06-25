@@ -1,26 +1,14 @@
 {
   "name": "telegram-movie-bot",
   "version": "1.0.0",
+  "description": "Автоматическая публикация фильмов в Telegram",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/qgor5/telegram-movie-bot.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/qgor5/telegram-movie-bot/issues"
-  },
-  "homepage": "https://github.com/qgor5/telegram-movie-bot#readme",
-  "description": "",
   "dependencies": {
-    "dotenv": "^16.5.0",
-    "node-cron": "^4.1.1",
-    "node-fetch": "^2.7.0",
-    "node-telegram-bot-api": "^0.63.0"
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "node-telegram-bot-api": "^0.61.0"
   }
 }
